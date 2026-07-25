@@ -127,7 +127,16 @@ Useful checks:
   gadget mode. `install.sh` rewrites that line to
   `dtoverlay=dwc2,dr_mode=peripheral` — if you edited `config.txt` by hand,
   make sure it says `dr_mode=peripheral`, not `dr_mode=host`, and reboot
-  afterwards (the overlay only applies at boot).
+  afterwards (the overlay only applies at boot). Also make sure that line
+  isn't sitting inside one of `config.txt`'s bracketed conditional sections
+  (`[cm4]`, `[cm5]`, `[pi5]`, ...) meant for different hardware - those
+  only apply on the matching board. `install.sh` avoids this by always
+  appending its own copy under an unconditional trailing `[all]` section
+  rather than editing whatever it finds.
+- If `dmesg | grep -i usb` shows `dwc_otg` attaching to the controller
+  instead of `dwc2`, the overlay isn't being applied at all (see above) -
+  the original Pi's vendor `dwc_otg` driver doesn't support gadget/device
+  mode, only `dwc2` does.
 - Also check `cat /boot/firmware/cmdline.txt` (or `/boot/cmdline.txt`) for
   `g_hid` in a `modules-load=` token. `g_hid` is the older single-function
   USB gadget driver; if it's loaded at boot it claims the Pi's one UDC for

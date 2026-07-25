@@ -25,21 +25,31 @@ else
     BOOT_CONFIG=/boot/config.txt
 fi
 # dr_mode=peripheral is required: it forces the dwc2 controller into USB
-# device/gadget mode. Some stock Raspberry Pi OS images already ship a
-# "dtoverlay=dwc2,dr_mode=host" line (for using the OTG port as a normal
-# host port) - that setting is incompatible with gadget mode, so if we find
-# an existing dtoverlay=dwc2 line we rewrite it rather than trusting it.
+# device/gadget mode.
+#
+# config.txt supports bracketed conditional sections ([cm4], [pi5], [all],
+# ...) - a bare dtoverlay=dwc2 line found by a naive grep/sed might actually
+# live under a section for different hardware (observed in the wild: a
+# stock image shipping "dtoverlay=dwc2,dr_mode=host" *inside a [cm5]
+# section*, which silently never applies on a Pi Zero W and left the
+# board on the legacy non-gadget-capable dwc_otg driver). Rewriting a line
+# in place without knowing what section it's under is unsafe, so instead
+# we always append our own copy under a trailing "[all]" section (added if
+# not already present), which applies unconditionally regardless of what
+# other board-specific lines exist earlier in the file.
 DWC2_LINE="dtoverlay=dwc2,dr_mode=peripheral"
-if grep -q '^dtoverlay=dwc2' "$BOOT_CONFIG"; then
-    if grep -qx "$DWC2_LINE" "$BOOT_CONFIG"; then
-        echo "    $BOOT_CONFIG already configured for USB peripheral (gadget) mode"
-    else
-        sed -i "s/^dtoverlay=dwc2.*/$DWC2_LINE/" "$BOOT_CONFIG"
-        echo "    rewrote existing dtoverlay=dwc2 line in $BOOT_CONFIG to force dr_mode=peripheral"
-    fi
+LAST_NONBLANK="$(grep -v '^[[:space:]]*$' "$BOOT_CONFIG" | tail -n1)"
+if [ "$LAST_NONBLANK" = "$DWC2_LINE" ]; then
+    echo "    $BOOT_CONFIG already unconditionally configured for USB peripheral (gadget) mode"
 else
+    if [ "$LAST_NONBLANK" != "[all]" ]; then
+        {
+            echo ""
+            echo "[all]"
+        } >> "$BOOT_CONFIG"
+    fi
     echo "$DWC2_LINE" >> "$BOOT_CONFIG"
-    echo "    added $DWC2_LINE to $BOOT_CONFIG"
+    echo "    appended $DWC2_LINE under an unconditional [all] section in $BOOT_CONFIG"
 fi
 
 if [ -f /boot/firmware/cmdline.txt ]; then
