@@ -104,8 +104,14 @@ journalctl -u hidproxy -f
 ## Manual run / debugging
 
 ```
-sudo /opt/hidproxy/venv/bin/python -m hidproxy.main --log-level DEBUG
+sudo /opt/hidproxy/venv/bin/hidproxy --log-level DEBUG
 ```
+
+(`hidproxy` is installed as a console script into the venv by `install.sh`,
+so this works from any directory. If you're hacking on the source without
+re-running `install.sh`, `cd /opt/hidproxy && sudo venv/bin/python -m
+hidproxy.main --log-level DEBUG` also works, since `-m` adds the current
+directory to `sys.path`.)
 
 Useful checks:
 - `ls /dev/hidg*` — should show `hidg0` and `hidg1` once

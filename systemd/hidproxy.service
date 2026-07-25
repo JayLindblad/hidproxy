@@ -6,7 +6,7 @@ Wants=bluetooth.target
 
 [Service]
 Type=simple
-ExecStart=/opt/hidproxy/venv/bin/python -m hidproxy.main
+ExecStart=/opt/hidproxy/venv/bin/hidproxy
 WorkingDirectory=/opt/hidproxy
 Restart=on-failure
 RestartSec=2

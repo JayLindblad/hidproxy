@@ -54,7 +54,7 @@ chmod +x "$INSTALL_DIR"/gadget/hid_gadget.sh "$INSTALL_DIR"/bin/hidproxy-pair
 echo "==> Creating Python virtualenv"
 python3 -m venv "$INSTALL_DIR/venv"
 "$INSTALL_DIR/venv/bin/pip" install --upgrade pip
-"$INSTALL_DIR/venv/bin/pip" install -r "$INSTALL_DIR/requirements.txt"
+"$INSTALL_DIR/venv/bin/pip" install -e "$INSTALL_DIR"
 
 echo "==> Installing systemd units"
 cp "$INSTALL_DIR"/systemd/hidproxy-gadget.service /etc/systemd/system/
