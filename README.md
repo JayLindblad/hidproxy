@@ -128,6 +128,13 @@ Useful checks:
   `dtoverlay=dwc2,dr_mode=peripheral` — if you edited `config.txt` by hand,
   make sure it says `dr_mode=peripheral`, not `dr_mode=host`, and reboot
   afterwards (the overlay only applies at boot).
+- Also check `cat /boot/firmware/cmdline.txt` (or `/boot/cmdline.txt`) for
+  `g_hid` in a `modules-load=` token. `g_hid` is the older single-function
+  USB gadget driver; if it's loaded at boot it claims the Pi's one UDC for
+  itself (misconfigured, since it needs module parameters hidproxy doesn't
+  set), which is why `/sys/class/udc` stays empty for everyone else,
+  including hidproxy's own configfs gadget. `install.sh` strips `g_hid` out
+  automatically - if you edited `cmdline.txt` by hand, remove it and reboot.
 
 ## Repo layout
 

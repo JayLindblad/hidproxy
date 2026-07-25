@@ -47,11 +47,47 @@ if [ -f /boot/firmware/cmdline.txt ]; then
 else
     CMDLINE=/boot/cmdline.txt
 fi
-if ! grep -q 'modules-load=dwc2' "$CMDLINE"; then
-    sed -i 's/rootwait/rootwait modules-load=dwc2/' "$CMDLINE"
-    echo "    added modules-load=dwc2 to $CMDLINE"
-else
-    echo "    modules-load=dwc2 already present in $CMDLINE"
+# Rewrite (or add) the modules-load= token on the kernel command line so it
+# loads dwc2 and nothing else conflicting. In particular strip out g_hid if
+# present: it's the older single-function USB gadget driver, it claims the
+# Pi's one and only UDC for itself at boot (with no module parameters, so it
+# doesn't even configure a usable HID function), and that's a hard conflict
+# with the libcomposite/configfs gadget hidproxy sets up - the symptom is
+# /sys/class/udc staying completely empty.
+python3 - "$CMDLINE" <<'PYEOF'
+import re
+import sys
+
+path = sys.argv[1]
+with open(path) as f:
+    content = f.read()
+
+
+def fix_modules_load(match):
+    mods = [m for m in match.group(1).split(",") if m and m != "g_hid"]
+    if "dwc2" not in mods:
+        mods.insert(0, "dwc2")
+    return "modules-load=" + ",".join(mods)
+
+
+if "modules-load=" in content:
+    new_content = re.sub(r"modules-load=(\S*)", fix_modules_load, content)
+else:
+    new_content = re.sub(r"\brootwait\b", "rootwait modules-load=dwc2", content, count=1)
+
+if new_content != content:
+    with open(path, "w") as f:
+        f.write(new_content)
+    print(f"    updated modules-load= in {path}")
+else:
+    print(f"    {path} already correct")
+PYEOF
+
+# Older Raspberry Pi OS setups sometimes load gadget modules via /etc/modules
+# instead of the kernel command line - same conflict, so check there too.
+if [ -f /etc/modules ] && grep -q '^g_hid' /etc/modules; then
+    sed -i 's/^g_hid/#g_hid  # disabled by hidproxy install.sh - conflicts with its USB gadget/' /etc/modules
+    echo "    disabled g_hid in /etc/modules (conflicts with hidproxy's USB gadget)"
 fi
 
 echo "==> Copying hidproxy to $INSTALL_DIR"
