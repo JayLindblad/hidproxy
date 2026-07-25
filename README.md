@@ -119,6 +119,15 @@ Useful checks:
 - `bluetoothctl devices` / `bluetoothctl paired-devices` — confirm pairing.
 - `evtest` (install via `apt`) — inspect raw evdev events from a paired
   device for troubleshooting the keymap.
+- `ls /sys/class/udc` — empty means the `dwc2` controller never registered
+  as a gadget-mode USB Device Controller, so `/dev/hidg*` can never appear.
+  The most common cause: some stock Raspberry Pi OS images already ship
+  `dtoverlay=dwc2,dr_mode=host` in `config.txt` (`/boot/firmware/config.txt`
+  on Bookworm), which forces **host** mode and is incompatible with
+  gadget mode. `install.sh` rewrites that line to
+  `dtoverlay=dwc2,dr_mode=peripheral` — if you edited `config.txt` by hand,
+  make sure it says `dr_mode=peripheral`, not `dr_mode=host`, and reboot
+  afterwards (the overlay only applies at boot).
 
 ## Repo layout
 

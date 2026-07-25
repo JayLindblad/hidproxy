@@ -24,11 +24,22 @@ if [ -f /boot/firmware/config.txt ]; then
 else
     BOOT_CONFIG=/boot/config.txt
 fi
-if ! grep -q '^dtoverlay=dwc2' "$BOOT_CONFIG"; then
-    echo "dtoverlay=dwc2" >> "$BOOT_CONFIG"
-    echo "    added dtoverlay=dwc2 to $BOOT_CONFIG"
+# dr_mode=peripheral is required: it forces the dwc2 controller into USB
+# device/gadget mode. Some stock Raspberry Pi OS images already ship a
+# "dtoverlay=dwc2,dr_mode=host" line (for using the OTG port as a normal
+# host port) - that setting is incompatible with gadget mode, so if we find
+# an existing dtoverlay=dwc2 line we rewrite it rather than trusting it.
+DWC2_LINE="dtoverlay=dwc2,dr_mode=peripheral"
+if grep -q '^dtoverlay=dwc2' "$BOOT_CONFIG"; then
+    if grep -qx "$DWC2_LINE" "$BOOT_CONFIG"; then
+        echo "    $BOOT_CONFIG already configured for USB peripheral (gadget) mode"
+    else
+        sed -i "s/^dtoverlay=dwc2.*/$DWC2_LINE/" "$BOOT_CONFIG"
+        echo "    rewrote existing dtoverlay=dwc2 line in $BOOT_CONFIG to force dr_mode=peripheral"
+    fi
 else
-    echo "    dtoverlay=dwc2 already present in $BOOT_CONFIG"
+    echo "$DWC2_LINE" >> "$BOOT_CONFIG"
+    echo "    added $DWC2_LINE to $BOOT_CONFIG"
 fi
 
 if [ -f /boot/firmware/cmdline.txt ]; then

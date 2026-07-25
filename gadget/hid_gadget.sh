@@ -8,6 +8,12 @@ set -e
 GADGET_DIR=/sys/kernel/config/usb_gadget/hidproxy
 UDC_NAME=$(ls /sys/class/udc | head -n1)
 
+# Writes a hex string (arg $1) as raw bytes to a file (arg $2). Avoids
+# depending on `xxd`, which isn't installed by default on Raspberry Pi OS Lite.
+write_hex() {
+    python3 -c "import sys; sys.stdout.buffer.write(bytes.fromhex(sys.argv[1]))" "$1" > "$2"
+}
+
 modprobe libcomposite || true
 
 if [ -d "$GADGET_DIR" ]; then
@@ -38,7 +44,7 @@ echo 1 > functions/hid.usb0/protocol
 echo 1 > functions/hid.usb0/subclass
 echo 8 > functions/hid.usb0/report_length
 KEYBOARD_DESC_HEX="05010906a101050719e029e71500250175019508810295017508810195057501050819012905910295017503910195067508150025650507190029658100c0"
-echo -n "$KEYBOARD_DESC_HEX" | xxd -r -p > functions/hid.usb0/report_desc
+write_hex "$KEYBOARD_DESC_HEX" functions/hid.usb0/report_desc
 
 # --- Mouse function (/dev/hidg1) ---
 mkdir -p functions/hid.usb1
@@ -46,7 +52,7 @@ echo 2 > functions/hid.usb1/protocol
 echo 1 > functions/hid.usb1/subclass
 echo 4 > functions/hid.usb1/report_length
 MOUSE_DESC_HEX="05010902a1010901a1000509190129051500250195057501810295017503810105010930093109381581257f750895038106c0c0"
-echo -n "$MOUSE_DESC_HEX" | xxd -r -p > functions/hid.usb1/report_desc
+write_hex "$MOUSE_DESC_HEX" functions/hid.usb1/report_desc
 
 ln -s functions/hid.usb0 configs/c.1/
 ln -s functions/hid.usb1 configs/c.1/
