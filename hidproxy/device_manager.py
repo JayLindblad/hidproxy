@@ -77,7 +77,7 @@ class DeviceManager:
         def _callback(device: pyudev.Device) -> None:
             loop.call_soon_threadsafe(self._on_udev_event, device.action, device)
 
-        self._observer = pyudev.MonitorObserver(monitor, _callback, name="hidproxy-udev")
+        self._observer = pyudev.MonitorObserver(monitor, callback=_callback, name="hidproxy-udev")
         self._observer.start()
         logger.info("watching for Bluetooth keyboard/mouse hotplug")
 
