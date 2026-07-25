@@ -57,8 +57,6 @@ write_hex "$MOUSE_DESC_HEX" functions/hid.usb1/report_desc
 ln -s functions/hid.usb0 configs/c.1/
 ln -s functions/hid.usb1 configs/c.1/
 
-udevadm settle -t 5 || true
-
 if [ -z "$UDC_NAME" ]; then
     echo "hid_gadget.sh: no UDC found (is dtoverlay=dwc2 enabled?)" >&2
     exit 1
