@@ -1,0 +1,18 @@
+[Unit]
+Description=Bluetooth-to-USB HID proxy
+After=hidproxy-gadget.service bluetooth.target dbus.service
+Requires=hidproxy-gadget.service
+Wants=bluetooth.target
+
+[Service]
+Type=simple
+ExecStart=/opt/hidproxy/venv/bin/python -m hidproxy.main
+WorkingDirectory=/opt/hidproxy
+Restart=on-failure
+RestartSec=2
+User=root
+# Needs: CAP_NET_ADMIN-ish bluez access (via dbus, granted by default policy for root),
+# and read/write on /dev/hidg* (root-owned char devices from the gadget driver).
+
+[Install]
+WantedBy=multi-user.target

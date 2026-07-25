@@ -1,0 +1,19 @@
+#!/bin/bash
+# Re-opens the Bluetooth pairing window so a keyboard/mouse can connect.
+# The hidproxy daemon must already be running (it owns the pairing agent);
+# this just flips the adapter into discoverable+pairable mode for a while.
+set -euo pipefail
+
+TIMEOUT="${1:-120}"
+
+echo "Putting the Pi's Bluetooth adapter into pairing mode for ${TIMEOUT}s..."
+echo "Put your keyboard/mouse into pairing mode now."
+
+bluetoothctl <<EOF
+power on
+discoverable-timeout ${TIMEOUT}
+pairable on
+discoverable on
+EOF
+
+echo "Pairing window open. Watch 'journalctl -u hidproxy -f' to see the device connect."

@@ -1,0 +1,14 @@
+[Unit]
+Description=Create USB HID gadget (keyboard + mouse) via configfs
+DefaultDependencies=no
+After=sys-kernel-config.mount local-fs.target
+Before=hidproxy.service
+Wants=sys-kernel-config.mount
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/opt/hidproxy/gadget/hid_gadget.sh
+
+[Install]
+WantedBy=sysinit.target
