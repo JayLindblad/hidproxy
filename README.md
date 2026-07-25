@@ -81,6 +81,53 @@ Watch progress with:
 journalctl -u hidproxy -f
 ```
 
+## Fast boot (using it as a BIOS-screen keyboard/mouse)
+
+If you want the keyboard/mouse usable before the target computer even
+finishes POST (e.g. to hit a BIOS/boot-menu key), there are three separate
+time budgets stacked on top of each other, and only the first is really
+ours to shrink:
+
+1. **The Pi's own boot time**, up to the point `hidproxy.service` starts.
+2. **Bluetooth radio bring-up** — the BT firmware upload over UART to the
+   chip and `bluetoothd` init. This is a largely fixed cost (roughly 1-3s)
+   independent of anything hidproxy does.
+3. **The keyboard's own reconnect behavior.** For classic Bluetooth HID,
+   *the keyboard* is what initiates reconnection to a previously-trusted
+   host, usually on a keypress — its scan/retry timing is entirely up to
+   the keyboard's own firmware, not something the Pi can speed up. In
+   practice this means pressing a key on the keyboard right as the target
+   machine powers on works better than expecting it to "already be
+   listening" the instant Pi boot finishes.
+
+What `install.sh` already does to help with (1):
+- Adds `disable_splash=1` and `boot_delay=0` to `config.txt` to skip the
+  rainbow splash render and any artificial power-on delay.
+- `hidproxy.service` is bound to `bluetooth.target` (not the broader
+  `multi-user.target`) so it starts the moment Bluetooth itself is up,
+  rather than waiting on unrelated default services.
+- `hidproxy.service` runs with `Nice=-10` and a realtime IO scheduling
+  class — on a single-core Pi Zero W, contention from other boot-time
+  services for the one CPU core is a real (if modest) source of delay.
+
+Beyond that, the biggest remaining lever is general Pi boot-time tuning,
+which is workload-specific enough that guessing isn't useful — profile it:
+
+```
+systemd-analyze blame        # which units take the longest
+systemd-analyze critical-path # what's actually on the critical path to boot
+```
+
+Common wins if they show up as culprits: a faster/higher-endurance SD card
+(SD I/O is very often the dominant boot bottleneck on a Pi), disabling
+`dphys-swapfile` (swap) if enabled, disabling unused services pulled in by
+your particular OS image (`avahi-daemon`, `triggerhappy`, etc. — check
+`systemctl list-unit-files --state=enabled`), and skipping first-boot-only
+work (filesystem resize, SSH host key generation) which shouldn't recur
+past the very first boot anyway. Be careful about disabling networking
+services for this, though — you'll usually still want SSH access to manage
+the Pi.
+
 ## Limitations / notes
 
 - **Classic Bluetooth HID only.** BLE-only keyboards/mice (HOGP) aren't

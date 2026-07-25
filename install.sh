@@ -24,33 +24,52 @@ if [ -f /boot/firmware/config.txt ]; then
 else
     BOOT_CONFIG=/boot/config.txt
 fi
-# dr_mode=peripheral is required: it forces the dwc2 controller into USB
-# device/gadget mode.
-#
 # config.txt supports bracketed conditional sections ([cm4], [pi5], [all],
 # ...) - a bare dtoverlay=dwc2 line found by a naive grep/sed might actually
 # live under a section for different hardware (observed in the wild: a
 # stock image shipping "dtoverlay=dwc2,dr_mode=host" *inside a [cm5]
 # section*, which silently never applies on a Pi Zero W and left the
 # board on the legacy non-gadget-capable dwc_otg driver). Rewriting a line
-# in place without knowing what section it's under is unsafe, so instead
-# we always append our own copy under a trailing "[all]" section (added if
-# not already present), which applies unconditionally regardless of what
-# other board-specific lines exist earlier in the file.
-DWC2_LINE="dtoverlay=dwc2,dr_mode=peripheral"
-LAST_NONBLANK="$(grep -v '^[[:space:]]*$' "$BOOT_CONFIG" | tail -n1)"
-if [ "$LAST_NONBLANK" = "$DWC2_LINE" ]; then
-    echo "    $BOOT_CONFIG already unconditionally configured for USB peripheral (gadget) mode"
-else
-    if [ "$LAST_NONBLANK" != "[all]" ]; then
-        {
-            echo ""
-            echo "[all]"
-        } >> "$BOOT_CONFIG"
-    fi
-    echo "$DWC2_LINE" >> "$BOOT_CONFIG"
-    echo "    appended $DWC2_LINE under an unconditional [all] section in $BOOT_CONFIG"
-fi
+# in place without knowing what section it's under is unsafe, and even a
+# plain "does this line exist anywhere" check is unsafe too (that same
+# board-scoped line would false-positive a match). So: only lines that
+# appear *after* the file's last "[all]" marker count as unconditionally
+# applied; anything else gets appended there (adding one final "[all]" if
+# the file doesn't already end with one).
+python3 - "$BOOT_CONFIG" <<'PYEOF'
+import sys
+
+path = sys.argv[1]
+wanted = [
+    "dtoverlay=dwc2,dr_mode=peripheral",  # forces USB device/gadget mode
+    "disable_splash=1",  # skip the rainbow splash render
+    "boot_delay=0",  # no artificial power-on delay
+]
+
+with open(path) as f:
+    lines = f.read().splitlines()
+
+all_indices = [i for i, line in enumerate(lines) if line.strip() == "[all]"]
+tail_start = all_indices[-1] + 1 if all_indices else len(lines)
+tail = [line.strip() for line in lines[tail_start:]]
+
+missing = [line for line in wanted if line not in tail]
+if not missing:
+    print("    config.txt already has all fast-boot / gadget-mode settings")
+else:
+    if not all_indices:
+        # Appending straight to EOF always lands under whatever the last
+        # [all] section already is - a fresh header is only needed if the
+        # file has no [all] section at all yet.
+        if lines and lines[-1].strip() != "":
+            lines.append("")
+        lines.append("[all]")
+    lines.extend(missing)
+    with open(path, "w") as f:
+        f.write("\n".join(lines) + "\n")
+    for line in missing:
+        print(f"    appended under an unconditional [all] section: {line}")
+PYEOF
 
 if [ -f /boot/firmware/cmdline.txt ]; then
     CMDLINE=/boot/firmware/cmdline.txt
@@ -114,6 +133,10 @@ python3 -m venv "$INSTALL_DIR/venv"
 "$INSTALL_DIR/venv/bin/pip" install -e "$INSTALL_DIR"
 
 echo "==> Installing systemd units"
+# Disable first in case an older install enabled these under a different
+# [Install] target (systemctl enable adds a symlink for the current target
+# but won't clean up one left over from a stale target on a prior install).
+systemctl disable hidproxy-gadget.service hidproxy.service 2>/dev/null || true
 cp "$INSTALL_DIR"/systemd/hidproxy-gadget.service /etc/systemd/system/
 cp "$INSTALL_DIR"/systemd/hidproxy.service /etc/systemd/system/
 ln -sf "$INSTALL_DIR/bin/hidproxy-pair" /usr/local/bin/hidproxy-pair

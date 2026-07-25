@@ -13,6 +13,16 @@ RestartSec=2
 User=root
 # Needs: CAP_NET_ADMIN-ish bluez access (via dbus, granted by default policy for root),
 # and read/write on /dev/hidg* (root-owned char devices from the gadget driver).
+# Bumped priority: on a single-core Pi Zero W, other boot-time services
+# competing for the one CPU core can delay us more than anything else here -
+# this is a real (if modest) win for getting the Bluetooth agent registered
+# and ready as early as possible.
+Nice=-10
+IOSchedulingClass=realtime
+IOSchedulingPriority=0
 
 [Install]
-WantedBy=multi-user.target
+# Bound to bluetooth.target rather than the broader multi-user.target: this
+# starts us the moment Bluetooth itself is ready, instead of waiting for
+# every other default service pulled in at boot.
+WantedBy=bluetooth.target
